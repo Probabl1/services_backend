@@ -164,7 +164,7 @@ app.post('/services', (req, res) => {
 });
 
 // Удалить услугу
-app.delete('/services/:id', (req, res) => {
+app.delete('/services/:id', isAuthenticated,(req, res) => {
     db.findOne({ _id: req.params.id }, (err, service) => {
         if (err) return res.status(500).send(err);
         if (!service) return res.status(404).send('Услуга не найдена');
