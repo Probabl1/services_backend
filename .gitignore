@@ -7,7 +7,7 @@
 .idea
 
 hashpassword.js
-bd/
+db/
 *.log
 dist/
 uploads/

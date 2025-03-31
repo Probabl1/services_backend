@@ -5,13 +5,17 @@ const cors = require('cors');
 const Datastore = require('nedb');
 require('dotenv').config();
 const app = express();
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 
 // Настройка CORS
-app.use(cors({
-    origin: 'http://localhost:3000', // Точный origin клиента
-    credentials: true // Разрешить передачу кук
-}));
+const corsOptions = {
+    origin: process.env.NODE_ENV === 'production'
+        ? ['https://ваш-сайт.com', 'https://admin.ваш-сайт.com']
+        : 'http://localhost:3000',
+    credentials: true
+};
+app.use(cors(corsOptions));
+
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 
@@ -19,7 +23,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // Для HTTPS установите true
+    cookie: { secure: process.env.NODE_ENV === 'production'} // Для HTTPS установите true
 }));
 
 // Middleware для проверки аутентификации
@@ -38,7 +42,7 @@ app.post('/admin/login', express.json(), async (req, res) => {
         return res.status(400).json({ message: 'Пароль обязателен' });
     }
 console.log(process.env.ADMIN_PASSWORD_HASH);
-    const isMatch = await bcrypt.compare(password, '$2b$11$6PrQzwf.2rXPvbnMBx4uX.SpZDDFjPRZgJSIQd/0iSMnPOY7OWSSy');
+    const isMatch = await bcrypt.compare(password, process.env.ADMIN_PASSWORD_HASH);
     if (isMatch) {
         req.session.isAuthenticated = true;
         return res.json({ success: true });
@@ -76,7 +80,20 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+// Фильтрация файлов
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.mimetype)) {
+        return cb(new Error('Only JPEG/PNG allowed'), false);
+    }
+    cb(null, true);
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+});
 
 // Создаем папку для загрузок, если ее нет
 const fs = require('fs');
