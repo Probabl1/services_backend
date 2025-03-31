@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 5001;
 // Настройка CORS
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production'
-        ? ['https://ваш-сайт.com', 'https://admin.ваш-сайт.com']
+        ? ['https://gexpc.ru', 'https://admin.gexpc.ru']
         : 'http://localhost:3000',
     credentials: true
 };
