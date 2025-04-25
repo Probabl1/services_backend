@@ -3,6 +3,8 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const Datastore = require('nedb');
+const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -10,21 +12,25 @@ const PORT = process.env.PORT || 5001;
 // Настройка CORS
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production'
-        ? ['https://gexpc.ru', 'https://admin.gexpc.ru', 'https://api.gexpc.ru']
-        : 'http://localhost:3000',
+        ?  ['https://gexpc.ru','https://95.163.222.63']
+        : ['http://localhost:3000', 'http://localhost:63342'],
     credentials: true
 };
+app.use(express.json());
 app.use(cors(corsOptions));
 
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production'} // Для HTTPS установите true
+    cookie: { secure: false} // Для HTTPS установите true
 }));
+
+// Инициализация БД
+const db = new Datastore({ filename: './db/services.db', autoload: true });
 
 // Middleware для проверки аутентификации
 function isAuthenticated(req, res, next) {
@@ -33,6 +39,61 @@ function isAuthenticated(req, res, next) {
     }
     res.status(401).json({ message: 'Не авторизован' });
 }
+
+app.post('/create-payment', async (req, res) => {
+
+    try {
+        const { customer, description, itemsList } = req.body;
+
+        const items = itemsList.map(item => ({
+            description: item.name,
+            quantity: Number(item.quantity).toFixed(3), // 1.000, 2.000 и т.д.
+            amount: {
+                value: Number(item.price).toFixed(2),     // "5500.00"
+                currency: "RUB"
+            },
+            vat_code: 1,
+            payment_subject: "service",
+            payment_mode: "full_prepayment"
+        }));
+        console.log(items);
+        const amount = itemsList.reduce((sum, item) => sum + Number(item.price*item.quantity), 0).toFixed(2)
+        console.log(amount);
+        const response = await axios.post('https://api.yookassa.ru/v3/payments', {
+            amount: {
+                value: amount,
+                currency: 'RUB'
+            },
+            capture: true,
+            confirmation: {
+                type: 'redirect',
+                return_url: 'https://gexpc.ru'
+            },
+            description: description || 'Оплата',
+            receipt: {
+                "customer" : {
+                    "full_name" : customer.full_name,
+                    "phone" : customer.phone,
+                },
+                "payment_id": "24b94598-000f-5000-9000-1b68e7b15f3f",
+                "type": "payment",
+                "send": "true",
+                "items": items
+            },
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + Buffer.from(`${process.env.SHOP_ID}:${process.env.PAYMENT_KEY}`).toString('base64'),
+                'Idempotence-Key': uuidv4()
+            }
+        });
+
+        res.json({ confirmation_url: response.data.confirmation.confirmation_url });
+    } catch (error) {
+        console.error('Ошибка при создании платежа:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Ошибка при создании платежа' });
+    }
+});
 
 // Маршрут для входа
 app.post('/admin/login', express.json(), async (req, res) => {
@@ -101,8 +162,6 @@ if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
 
-// Инициализация БД
-const db = new Datastore({ filename: './db/services.db', autoload: true });
 
 // Разрешаем доступ к статическим файлам
 app.use('/uploads', express.static('uploads'));
