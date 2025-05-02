@@ -104,12 +104,12 @@ app.post('/create-donation', async (req, res) => {
             },
             amount: 500.00
         };
-
+        console.log(customer, amount);
         const item = [{
             description: 'Пожертвование',
             quantity: 1.000,
             amount: {
-                value: amount.toFixed(2),     // "5500.00"
+                value: Number(amount).toFixed(2),     // "5500.00"
                 currency: "RUB"
             },
             vat_code: 1,
