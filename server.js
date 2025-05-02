@@ -75,7 +75,6 @@ app.post('/create-payment', async (req, res) => {
                     "full_name" : customer.full_name,
                     "phone" : customer.phone,
                 },
-                "payment_id": "24b94598-000f-5000-9000-1b68e7b15f3f",
                 "type": "payment",
                 "send": "true",
                 "items": items
@@ -95,6 +94,62 @@ app.post('/create-payment', async (req, res) => {
     }
 });
 
+app.post('/create-donation', async (req, res) => {
+
+    try {
+        const { customer, amount  } = process.env.NODE_ENV === 'production' ? req.body : {
+            customer: {
+                full_name: 'Вася пупкин',
+                phone: '+79783373475'
+            },
+            amount: 500.00
+        };
+
+        const item = [{
+            description: 'Пожертвование',
+            quantity: 1.000,
+            amount: {
+                value: amount.toFixed(2),     // "5500.00"
+                currency: "RUB"
+            },
+            vat_code: 1,
+            payment_subject: "service",
+            payment_mode: "full_prepayment"
+        }];
+        const response = await axios.post('https://api.yookassa.ru/v3/payments', {
+            amount: {
+                value: amount,
+                currency: 'RUB'
+            },
+            capture: true,
+            confirmation: {
+                type: 'redirect',
+                return_url: 'https://gexpc.ru'
+            },
+            description:  'Пожертвоание',
+            receipt: {
+                "customer" : {
+                    "full_name" : customer.full_name,
+                    "phone" : customer.phone,
+                },
+                "send": "true",
+                "type": "payment",
+                "items": item
+            },
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + Buffer.from(`${process.env.SHOP_ID}:${process.env.PAYMENT_KEY}`).toString('base64'),
+                'Idempotence-Key': uuidv4()
+            }
+        });
+
+        res.json({ confirmation_url: response.data.confirmation.confirmation_url });
+    } catch (error) {
+        console.error('Ошибка при создании платежа:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Ошибка при создании платежа' });
+    }
+});
 // Маршрут для входа
 app.post('/admin/login', express.json(), async (req, res) => {
     const { password } = req.body;
