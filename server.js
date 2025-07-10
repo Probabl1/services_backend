@@ -11,11 +11,12 @@ const PORT = process.env.PORT || 5001;
 
 // Настройка CORS
 const corsOptions = {
-    origin: process.env.NODE_ENV === 'production'
-        ?  ['https://gexpc.ru','https://95.163.222.63']
+    origin: process.env.CORS_IP
+        ? process.env.CORS_IP.split(',')  // поддержка нескольких адресов через запятую
         : ['http://localhost:3000', 'http://localhost:63342'],
     credentials: true
 };
+
 app.use(express.json());
 app.use(cors(corsOptions));
 
